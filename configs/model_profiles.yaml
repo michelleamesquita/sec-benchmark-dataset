@@ -1,0 +1,23 @@
+default:
+  engine: openai
+  model: gpt-4o
+  temperature: 0.2
+  max_tokens: 1800
+
+gpt-4o:
+  engine: openai
+  model: gpt-4o
+  temperature: 0.2
+  max_tokens: 1800
+
+starcoder2-7b:
+  engine: hf
+  model: bigcode/starcoder2-7b
+  temperature: 0.4
+  max_tokens: 1200
+
+codellama-13b:
+  engine: hf
+  model: codellama/CodeLlama-13b-Instruct-hf
+  temperature: 0.4
+  max_tokens: 1200
