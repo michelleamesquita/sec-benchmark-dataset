@@ -4,6 +4,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
 from scipy.stats import spearmanr
 import warnings
 warnings.filterwarnings('ignore')
@@ -148,6 +150,15 @@ print(feat_importance.head(15).to_string(index=False))
 print(f"\n💡 Feature Importance mede quanto cada feature contribui para as decisões")
 print(f"   das árvores (quanto maior, mais importante para distinguir as classes)\n")
 
+# Salvar figura: coeficiente.png (importância de features)
+top_k = 15 if len(feat_importance) >= 15 else len(feat_importance)
+plt.figure(figsize=(9,6))
+sns.barplot(x='Importance', y='Feature', data=feat_importance.head(top_k))
+plt.title('Top Features - Importância (Random Forest)')
+plt.tight_layout()
+plt.savefig('coeficiente.png')
+plt.close()
+
 # Análise de direção: features aumentam ou diminuem risco?
 print(f"{'='*70}")
 print("ANÁLISE DE DIREÇÃO: Features que aumentam vs diminuem risco")
@@ -195,8 +206,36 @@ print("Matriz de Confusão:")
 cm = confusion_matrix(y_test, y_pred)
 print(cm)
 
+# Salvar figura: previsao.png (Matriz de Confusão)
+plt.figure(figsize=(6,5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=['Previsto 0','Previsto 1'],
+            yticklabels=['Real 0','Real 1'])
+plt.title('Matriz de Confusão - Random Forest')
+plt.xlabel('Previsto')
+plt.ylabel('Real')
+plt.tight_layout()
+plt.savefig('previsao.png')
+plt.close()
+
 print("\nRelatório de Classificação:")
 print(classification_report(y_test, y_pred, digits=3))
+
+# Salvar figura: regressao.png (métricas por classe)
+report_dict = classification_report(y_test, y_pred, output_dict=True)
+classes = ['0','1']
+metrics = ['precision','recall','f1-score']
+plot_df = pd.DataFrame({m: [report_dict.get(c,{}).get(m,0) for c in classes] for m in metrics},
+                       index=['Classe 0','Classe 1'])
+plot_df.plot(kind='bar', figsize=(7,5))
+plt.ylim(0,1)
+plt.title('Métricas por Classe - Random Forest')
+plt.ylabel('Score')
+plt.xlabel('Classe')
+plt.legend(loc='lower right')
+plt.tight_layout()
+plt.savefig('regressao.png')
+plt.close()
 
 # =============================================================================
 # ANÁLISE POR MODELO
