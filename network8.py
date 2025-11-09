@@ -5,6 +5,7 @@ import numpy as np
 import seaborn as sns
 from itertools import combinations
 from networkx.algorithms.community import louvain_communities
+from scipy.stats import lognorm
 
 df = pd.read_csv('all_findings_flat.csv')
 df_gpt = df[(df['model'] == 'gpt-4o') & (df['patch_lines'] > 0)].copy()
@@ -180,6 +181,26 @@ def plot_loglog(degree_dict, titulo, arq, cor='b', limiar=1):
     plt.close()
 plot_loglog(out_degrees, 'Log-log Out-degree (Influência/Changeability)', 'loglog_outdegree_filename_pct70.png')
 plot_loglog(in_degrees, 'Log-log In-degree (Dependência/Reusability)', 'loglog_indegree_filename_pct70.png', cor='orange')
+
+
+def plot_lognormal_hist(degree_dict, titulo, nome_arq, cor='blue'):
+    vals = np.array(list(degree_dict.values()))
+    plt.figure(figsize=(7,4))
+    sns.histplot(vals, bins=8, stat='density', color=cor, edgecolor='black', alpha=0.6)
+    shape, loc, scale = lognorm.fit(vals, floc=0)
+    x_vals = np.linspace(vals.min(), vals.max(), 100)
+    plt.plot(x_vals, lognorm.pdf(x_vals, shape, loc, scale), 'r-', lw=2, label='Ajuste Log-normal')
+    plt.xlabel('Grau')
+    plt.ylabel('Densidade')
+    plt.title(titulo)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(nome_arq)
+    plt.close()
+
+plot_lognormal_hist(out_degrees, 'Histograma Log-normal Out-degree (Influência)', 'hist_lognormal_outdegree.png', cor='blue')
+plot_lognormal_hist(in_degrees, 'Histograma Log-normal In-degree (Dependência)', 'hist_lognormal_indegree.png', cor='orange')
+
 
 print("\n===== Respostas Pesquisas =====")
 print("RQ1: CWEs exercendo maior influência (causas raiz):", main_causes[:5])
