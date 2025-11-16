@@ -303,16 +303,21 @@ df_problematic['patch_type'] = 1  # Problemático
 
 df_combined = pd.concat([df_correction, df_problematic], ignore_index=True)
 
-# Preparar features (TODAS as features numéricas, exceto target e patch_type)
-exclude_cols = ['is_risky', 'patch_type']
-numeric_cols = df_combined.select_dtypes(include=[np.number]).columns.tolist()
-feature_cols = [col for col in numeric_cols if col not in exclude_cols]
+# Preparar features: USAR AS MESMAS FEATURES DO MODELO PRINCIPAL
+# (todas as features numéricas, exceto targets)
+X_patches_full = df_combined.drop(columns=['is_risky', 'patch_type'])
 
-print(f"\n📊 Usando {len(feature_cols)} features para análise SHAP de Correção vs Problemático")
-print(f"   Features: {feature_cols[:5]}... (total: {len(feature_cols)})\n")
+# Remover colunas não numéricas (mesma lógica do modelo principal)
+non_numeric = X_patches_full.select_dtypes(exclude=[np.number]).columns
+if len(non_numeric) > 0:
+    X_patches_full = X_patches_full.drop(columns=non_numeric)
 
-X_patches = df_combined[feature_cols].copy()
+X_patches = X_patches_full.astype('float64')
 y_patches = df_combined['patch_type'].copy()
+
+print(f"\n📊 Usando {X_patches.shape[1]} features (MESMAS do modelo principal)")
+print(f"   Top features: {X_patches.columns.tolist()[:10]}")
+print(f"   Isso permite comparar com o modelo principal de risco!\n")
 
 # Verificar se há amostras suficientes
 if len(X_patches) < 100:
