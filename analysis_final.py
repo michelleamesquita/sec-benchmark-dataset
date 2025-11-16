@@ -743,8 +743,19 @@ shap_values = explainer_shap.shap_values(X_test_sample)
 # Se for lista, pegar valores da classe positiva (risco = 1)
 if isinstance(shap_values, list):
     shap_values_class1 = shap_values[1]  # Classe positiva (risco)
+    print(f"🔬 DEBUG SHAP: shap_values é lista com {len(shap_values)} elementos")
 else:
     shap_values_class1 = shap_values
+    print(f"🔬 DEBUG SHAP: shap_values é array")
+
+print(f"   Shape de shap_values_class1: {shap_values_class1.shape}")
+print(f"   Shape de X_test_sample: {X_test_sample.shape}")
+print(f"   Features em X_test_sample: {X_test_sample.columns.tolist()[:10]}...")
+
+# Verificar quantas features têm valores SHAP não-zero
+shap_mean = np.abs(shap_values_class1).mean(axis=0)
+non_zero_shap = (shap_mean > 0.0001).sum()
+print(f"   Features com SHAP > 0.0001: {non_zero_shap}/{len(shap_mean)}\n")
 
 # 1. SHAP Summary Bar Plot (importância global)
 print("Gerando SHAP bar plot (importância global)...")
