@@ -192,19 +192,78 @@ print("   • Para análise completa, seria necessário dados de 'antes' e 'depo
 print(f"{'='*80}")
 print("ANÁLISE ESPECÍFICA: Patches de Correção vs Patches Problemáticos")
 print(f"{'='*80}\n")
+# 4. Remover outliers
+cols_outliers = ["patch_lines", "patch_added", "patch_removed", "patch_files_touched",
+                 "patch_hunks", "patch_churn", "patch_net", "prompt_chars",
+                 "prompt_lines", "prompt_tokens"]
+def remove_outliers(df, col):
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lim_inf = Q1 - 1.5 * IQR
+    lim_sup = Q3 + 1.5 * IQR
+    return df[(df[col] >= lim_inf) & (df[col] <= lim_sup)]
+for col in cols_outliers:
+    if col in df.columns:
+        df = remove_outliers(df, col)
+
+print(f"Dataset: {len(df)} amostras\n")
+
+# =============================================================================
+# FEATURE ENGINEERING - CRIAR FEATURES DERIVADAS
+# =============================================================================
+print(f"{'='*70}")
+print(f"FEATURE ENGINEERING")
+print(f"{'='*70}\n")
+
+# 5. Guardar informações antes
+model_info = df['model'].copy()
+patch_lines_original = df['patch_lines'].copy()
+patch_added_original = df['patch_added'].copy()
+
+print("Criando features derivadas que melhoram a predição...")
+
+# Razões e densidades (ESSAS FEATURES FUNCIONAM!)
+df['patch_density'] = df['patch_churn'] / (df['patch_lines'] + 1)
+df['add_remove_ratio'] = df['patch_added'] / (df['patch_removed'] + 1)
+df['net_per_line'] = df['patch_net'] / (df['patch_lines'] + 1)
+df['hunks_per_file'] = df['patch_hunks'] / (df['patch_files_touched'] + 1)
+
+# Características do prompt
+df['prompt_density'] = df['prompt_chars'] / (df['prompt_lines'] + 1)
+df['prompt_token_density'] = df['prompt_tokens'] / (df['prompt_chars'] + 1)
+df['prompt_size_category'] = pd.cut(df['prompt_chars'], bins=[0, 500, 1000, 2000, np.inf], 
+                                     labels=[0, 1, 2, 3]).astype(int)
+
+# Complexidade e intensidade
+df['patch_complexity'] = df['patch_hunks'] * df['patch_files_touched']
+df['change_intensity'] = df['patch_churn'] / (df['patch_files_touched'] + 1)
+
+# Interações com temperature
+df['temp_x_prompt_size'] = df['temperature'] * df['prompt_chars']
+df['temp_x_patch_size'] = df['temperature'] * df['patch_lines']
+
+print(f"✅ Features derivadas criadas!\n")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ANÁLISE ESPECÍFICA: Patches de Correção vs Patches Problemáticos
+# (MOVIDO PARA CÁ para usar as features derivadas!)
+# ═════════════════════════════════════════════════════════════════════════════
+print(f"{'='*80}")
+print("QP4: ANÁLISE DE PATCHES DE CORREÇÃO VS PROBLEMÁTICOS")
+print(f"{'='*80}\n")
 
 print("🔍 Identificando padrões em patches que CORRIGEM vs patches que INTRODUZEM vulnerabilidades...\n")
 
-# Heurística: Patches de correção tendem a ter mais remoções do que adições
-df_cwe_analysis['net_change'] = df_cwe_analysis['patch_added'] - df_cwe_analysis['patch_lines'] + df_cwe_analysis['patch_added']
-df_cwe_analysis['removal_ratio'] = (df_cwe_analysis['patch_lines'] - df_cwe_analysis['patch_added']) / (df_cwe_analysis['patch_lines'] + 1)
+# Adicionar removal_ratio ao df (se ainda não existir)
+if 'removal_ratio' not in df.columns:
+    df['removal_ratio'] = (df['patch_lines'] - df['patch_added']) / (df['patch_lines'] + 1)
 
-# Classificar patches
+# Criar subsets para análise
 # Patches de "correção": sem vulnerabilidade E removem mais código (removal_ratio > 0.3)
 # Patches "problemáticos": com vulnerabilidade
-df_correction = df_cwe_analysis[(df_cwe_analysis['is_risky'] == 0) & 
-                                 (df_cwe_analysis['removal_ratio'] > 0.3)].copy()
-df_problematic = df_cwe_analysis[df_cwe_analysis['is_risky'] == 1].copy()
+df_correction = df[(df['is_risky'] == 0) & (df['removal_ratio'] > 0.3)].copy()
+df_problematic = df[df['is_risky'] == 1].copy()
 
 print(f"📊 Estatísticas:")
 print(f"   • Patches de CORREÇÃO (seguros + removem código): {len(df_correction)}")
@@ -269,8 +328,10 @@ print(f"\n{'─'*80}")
 print("CARACTERÍSTICAS: Patches de Correção vs Problemáticos")
 print(f"{'─'*80}\n")
 
-correction_features = df_correction[['patch_lines', 'patch_added', 'removal_ratio']].describe()
-problem_features = df_problematic[['patch_lines', 'patch_added', 'removal_ratio']].describe()
+feature_cols_compare = ['patch_lines', 'patch_added', 'removal_ratio', 
+                        'patch_density', 'hunks_per_file', 'patch_complexity']
+correction_features = df_correction[feature_cols_compare].describe()
+problem_features = df_problematic[feature_cols_compare].describe()
 
 print("PATCHES DE CORREÇÃO:")
 print(correction_features.loc[['mean', 'std', '50%']].T)
@@ -298,26 +359,29 @@ print(f"{'─'*80}\n")
 print("🔬 Treinando modelo específico para distinguir correções de problemas...\n")
 
 # Combinar datasets e criar labels
-df_correction['patch_type'] = 0  # Correção
-df_problematic['patch_type'] = 1  # Problemático
+df_correction_shap = df_correction.copy()
+df_problematic_shap = df_problematic.copy()
 
-df_combined = pd.concat([df_correction, df_problematic], ignore_index=True)
+df_correction_shap['patch_type'] = 0  # Correção
+df_problematic_shap['patch_type'] = 1  # Problemático
 
-# Preparar features: USAR AS MESMAS FEATURES DO MODELO PRINCIPAL
-# (todas as features numéricas, exceto targets)
-X_patches_full = df_combined.drop(columns=['is_risky', 'patch_type'])
+df_combined_shap = pd.concat([df_correction_shap, df_problematic_shap], ignore_index=True)
 
-# Remover colunas não numéricas (mesma lógica do modelo principal)
+# Preparar features: usar TODAS as features derivadas (exceto model, is_risky, patch_type)
+exclude_cols = ['model', 'is_risky', 'patch_type']
+X_patches_full = df_combined_shap.drop(columns=[c for c in exclude_cols if c in df_combined_shap.columns])
+
+# Remover colunas não numéricas
 non_numeric = X_patches_full.select_dtypes(exclude=[np.number]).columns
 if len(non_numeric) > 0:
     X_patches_full = X_patches_full.drop(columns=non_numeric)
 
 X_patches = X_patches_full.astype('float64')
-y_patches = df_combined['patch_type'].copy()
+y_patches = df_combined_shap['patch_type'].copy()
 
-print(f"\n📊 Usando {X_patches.shape[1]} features (MESMAS do modelo principal)")
-print(f"   Top features: {X_patches.columns.tolist()[:10]}")
-print(f"   Isso permite comparar com o modelo principal de risco!\n")
+print(f"\n📊 Usando {X_patches.shape[1]} features (COM features derivadas!)")
+print(f"   Features incluídas: {X_patches.columns.tolist()[:10]}...")
+print(f"   Isso permite ver o impacto de density, complexity, etc.!\n")
 
 # Verificar se há amostras suficientes
 if len(X_patches) < 100:
@@ -363,9 +427,9 @@ else:
     
     # Gráfico 1: SHAP Summary (bar plot)
     print("Gerando SHAP summary bar plot...")
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 8))
     shap.summary_plot(shap_values_patches_class1, X_patches_sample, 
-                      plot_type="bar", show=False)
+                      plot_type="bar", show=False, max_display=15)
     plt.title('SHAP: Features que aumentam risco de ser PROBLEMÁTICO', 
               fontsize=14, fontweight='bold', pad=15)
     plt.tight_layout()
@@ -375,8 +439,8 @@ else:
     
     # Gráfico 2: SHAP Beeswarm (direção e magnitude)
     print("Gerando SHAP beeswarm plot...")
-    plt.figure(figsize=(10, 6))
-    shap.summary_plot(shap_values_patches_class1, X_patches_sample, show=False)
+    plt.figure(figsize=(10, 8))
+    shap.summary_plot(shap_values_patches_class1, X_patches_sample, show=False, max_display=15)
     plt.title('SHAP: Impacto das Features (Correção → Problemático)', 
               fontsize=14, fontweight='bold', pad=15)
     plt.tight_layout()
@@ -417,7 +481,7 @@ else:
         'SHAP_Importance': shap_list
     }).sort_values('SHAP_Importance', ascending=False)
     
-    print(shap_df_patches.to_string(index=False))
+    print(shap_df_patches.head(15).to_string(index=False))
     
     print(f"\n💡 INTERPRETAÇÃO:")
     top_feature = shap_df_patches.iloc[0]['Feature']
@@ -428,7 +492,9 @@ else:
     print(f"     - Direita (positivo) = AUMENTA chance de ser problemático")
     print(f"     - Esquerda (negativo) = AUMENTA chance de ser correção")
     
-    if top_feature == 'removal_ratio':
+    if 'density' in top_feature or 'complexity' in top_feature:
+        print(f"\n   ✅ '{top_feature}' é chave: features DERIVADAS são importantes!")
+    elif top_feature == 'removal_ratio':
         print(f"\n   ✅ 'removal_ratio' é chave: patches que REMOVEM código tendem a ser correções!")
     elif top_feature == 'patch_lines':
         print(f"\n   ✅ 'patch_lines' é chave: tamanho do patch é um indicador forte!")
@@ -436,97 +502,6 @@ else:
 print(f"\n{'='*80}")
 print("✅ Análise de Correção vs Problema concluída!")
 print(f"{'='*80}\n")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# EXIBIR TODAS AS IMAGENS GERADAS
-# ─────────────────────────────────────────────────────────────────────────────
-print(f"{'='*80}")
-print("📊 EXIBINDO TODAS AS IMAGENS GERADAS")
-print(f"{'='*80}\n")
-
-from PIL import Image
-import os
-
-# Lista de imagens para exibir
-images_to_display = [
-    ('top10_cwes_por_modelo.png', 'QP2: Top 10 CWEs por Modelo'),
-    ('heatmap_cwes_modelo.png', 'QP2: Heatmap CWEs x Modelo'),
-    ('correcao_vs_problema_modelo.png', 'QP4: Correção vs Problema por Modelo'),
-    ('shap_correcao_bar.png', 'QP4: SHAP - Importância (Correção)'),
-    ('shap_correcao_beeswarm.png', 'QP4: SHAP - Impacto Direcionado (Correção)'),
-]
-
-print("Exibindo imagens principais da análise:\n")
-for img_file, description in images_to_display:
-    if os.path.exists(img_file):
-        print(f"  ✅ {description}")
-        try:
-            Image.open(img_file).show()
-        except Exception as e:
-            print(f"     ⚠️  Erro ao exibir: {e}")
-    else:
-        print(f"  ❌ {description} - arquivo não encontrado")
-
-print(f"\n{'='*80}")
-print("✅ Todas as imagens principais foram exibidas!")
-print(f"{'='*80}\n")
-
-print(f"{'='*80}")
-print("✅ Análise das QPs concluída!")
-print(f"{'='*80}\n")
-
-# 4. Remover outliers
-cols_outliers = ["patch_lines", "patch_added", "patch_removed", "patch_files_touched",
-                 "patch_hunks", "patch_churn", "patch_net", "prompt_chars",
-                 "prompt_lines", "prompt_tokens"]
-def remove_outliers(df, col):
-    Q1 = df[col].quantile(0.25)
-    Q3 = df[col].quantile(0.75)
-    IQR = Q3 - Q1
-    lim_inf = Q1 - 1.5 * IQR
-    lim_sup = Q3 + 1.5 * IQR
-    return df[(df[col] >= lim_inf) & (df[col] <= lim_sup)]
-for col in cols_outliers:
-    if col in df.columns:
-        df = remove_outliers(df, col)
-
-print(f"Dataset: {len(df)} amostras\n")
-
-# =============================================================================
-# FEATURE ENGINEERING - CRIAR FEATURES DERIVADAS
-# =============================================================================
-print(f"{'='*70}")
-print(f"FEATURE ENGINEERING")
-print(f"{'='*70}\n")
-
-# 5. Guardar informações antes
-model_info = df['model'].copy()
-patch_lines_original = df['patch_lines'].copy()
-patch_added_original = df['patch_added'].copy()
-
-print("Criando features derivadas que melhoram a predição...")
-
-# Razões e densidades (ESSAS FEATURES FUNCIONAM!)
-df['patch_density'] = df['patch_churn'] / (df['patch_lines'] + 1)
-df['add_remove_ratio'] = df['patch_added'] / (df['patch_removed'] + 1)
-df['net_per_line'] = df['patch_net'] / (df['patch_lines'] + 1)
-df['hunks_per_file'] = df['patch_hunks'] / (df['patch_files_touched'] + 1)
-
-# Características do prompt
-df['prompt_density'] = df['prompt_chars'] / (df['prompt_lines'] + 1)
-df['prompt_token_density'] = df['prompt_tokens'] / (df['prompt_chars'] + 1)
-df['prompt_size_category'] = pd.cut(df['prompt_chars'], bins=[0, 500, 1000, 2000, np.inf], 
-                                     labels=[0, 1, 2, 3]).astype(int)
-
-# Complexidade e intensidade
-df['patch_complexity'] = df['patch_hunks'] * df['patch_files_touched']
-df['change_intensity'] = df['patch_churn'] / (df['patch_files_touched'] + 1)
-
-# Interações com temperature
-df['temp_x_prompt_size'] = df['temperature'] * df['prompt_chars']
-df['temp_x_patch_size'] = df['temperature'] * df['patch_lines']
-
-print(f"✅ Features derivadas criadas!\n")
 
 # 6. REMOVER FEATURES CWE (data leakage - informação do futuro!)
 print("⚠️  REMOVENDO features CWE para evitar data leakage...")
@@ -1314,3 +1289,37 @@ print(f"4. ✅ CORRELAÇÃO FORTE (0.{int(correlation*1000):03d}) entre ML e rea
 print("\n→ Random Forest captura relações NÃO-LINEARES que são ESSENCIAIS")
 print("  para distinguir código seguro de arriscado neste dataset!")
 print(f"{'='*80}")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# EXIBIR TODAS AS IMAGENS GERADAS (NO FINAL DE TODAS AS ANÁLISES)
+# ═════════════════════════════════════════════════════════════════════════════
+print(f"\n{'='*80}")
+print("📊 EXIBINDO TODAS AS IMAGENS GERADAS")
+print(f"{'='*80}\n")
+
+from PIL import Image
+import os
+
+# Lista de imagens para exibir
+images_to_display = [
+    ('top10_cwes_por_modelo.png', 'QP2: Top 10 CWEs por Modelo'),
+    ('heatmap_cwes_modelo.png', 'QP2: Heatmap CWEs x Modelo'),
+    ('correcao_vs_problema_modelo.png', 'QP4: Correção vs Problema por Modelo'),
+    ('shap_correcao_bar.png', 'QP4: SHAP - Importância (Correção)'),
+    ('shap_correcao_beeswarm.png', 'QP4: SHAP - Impacto Direcionado (Correção)'),
+]
+
+print("Exibindo imagens principais da análise:\n")
+for img_file, description in images_to_display:
+    if os.path.exists(img_file):
+        print(f"  ✅ {description}")
+        try:
+            Image.open(img_file).show()
+        except Exception as e:
+            print(f"     ⚠️  Erro ao exibir: {e}")
+    else:
+        print(f"  ❌ {description} - arquivo não encontrado")
+
+print(f"\n{'='*80}")
+print("✅ ANÁLISE COMPLETA! Todas as imagens principais foram exibidas!")
+print(f"{'='*80}\n")
