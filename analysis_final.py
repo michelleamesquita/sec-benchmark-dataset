@@ -384,10 +384,26 @@ else:
     if len(shap_importance_patches.shape) > 1:
         shap_importance_patches = shap_importance_patches.ravel()
     
+    # Debug: verificar tamanhos
+    num_features = len(X_patches_sample.columns)
+    num_shap = len(shap_importance_patches)
+    
+    print(f"Debug: {num_features} features, {num_shap} valores SHAP")
+    
+    # Ajustar se necessário
+    if num_features != num_shap:
+        print(f"⚠️  Descompasso detectado. Usando mínimo: {min(num_features, num_shap)}")
+        min_size = min(num_features, num_shap)
+        features_list = X_patches_sample.columns.tolist()[:min_size]
+        shap_list = shap_importance_patches.tolist()[:min_size]
+    else:
+        features_list = X_patches_sample.columns.tolist()
+        shap_list = shap_importance_patches.tolist()
+    
     # Criar DataFrame com segurança
     shap_df_patches = pd.DataFrame({
-        'Feature': X_patches_sample.columns.tolist(),
-        'SHAP_Importance': shap_importance_patches.tolist()
+        'Feature': features_list,
+        'SHAP_Importance': shap_list
     }).sort_values('SHAP_Importance', ascending=False)
     
     print(shap_df_patches.to_string(index=False))
