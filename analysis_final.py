@@ -379,9 +379,15 @@ else:
     print(f"{'─'*60}\n")
     
     shap_importance_patches = np.abs(shap_values_patches_class1).mean(axis=0)
+    
+    # Garantir que seja 1D
+    if len(shap_importance_patches.shape) > 1:
+        shap_importance_patches = shap_importance_patches.ravel()
+    
+    # Criar DataFrame com segurança
     shap_df_patches = pd.DataFrame({
-        'Feature': X_patches_sample.columns,
-        'SHAP_Importance': shap_importance_patches
+        'Feature': X_patches_sample.columns.tolist(),
+        'SHAP_Importance': shap_importance_patches.tolist()
     }).sort_values('SHAP_Importance', ascending=False)
     
     print(shap_df_patches.to_string(index=False))
