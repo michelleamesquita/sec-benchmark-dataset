@@ -10,7 +10,6 @@ from scipy.stats import spearmanr, f_oneway, chi2_contingency
 import warnings
 warnings.filterwarnings('ignore')
 import shap
-from PIL import Image
 
 
 print(f"{'='*70}")
@@ -186,6 +185,112 @@ print(f"\n💡 INTERPRETAÇÃO:")
 print("   • Modelos com MENOS vulnerabilidades HIGH são melhores em correções")
 print("   • Modelos com MAIS vulnerabilidades HIGH tendem a introduzir novos problemas")
 print("   • Para análise completa, seria necessário dados de 'antes' e 'depois' do patch\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ANÁLISE ESPECÍFICA: PATCHES DE CORREÇÃO vs PATCHES QUE INTRODUZEM VULNERABILIDADES
+# ─────────────────────────────────────────────────────────────────────────────
+print(f"{'='*80}")
+print("ANÁLISE ESPECÍFICA: Patches de Correção vs Patches Problemáticos")
+print(f"{'='*80}\n")
+
+print("🔍 Identificando padrões em patches que CORRIGEM vs patches que INTRODUZEM vulnerabilidades...\n")
+
+# Heurística: Patches de correção tendem a ter mais remoções do que adições
+df_cwe_analysis['net_change'] = df_cwe_analysis['patch_added'] - df_cwe_analysis['patch_lines'] + df_cwe_analysis['patch_added']
+df_cwe_analysis['removal_ratio'] = (df_cwe_analysis['patch_lines'] - df_cwe_analysis['patch_added']) / (df_cwe_analysis['patch_lines'] + 1)
+
+# Classificar patches
+# Patches de "correção": sem vulnerabilidade E removem mais código (removal_ratio > 0.3)
+# Patches "problemáticos": com vulnerabilidade
+df_correction = df_cwe_analysis[(df_cwe_analysis['is_risky'] == 0) & 
+                                 (df_cwe_analysis['removal_ratio'] > 0.3)].copy()
+df_problematic = df_cwe_analysis[df_cwe_analysis['is_risky'] == 1].copy()
+
+print(f"📊 Estatísticas:")
+print(f"   • Patches de CORREÇÃO (seguros + removem código): {len(df_correction)}")
+print(f"   • Patches PROBLEMÁTICOS (introduzem vulnerabilidades): {len(df_problematic)}")
+print(f"   • Ratio: {len(df_problematic)/len(df_correction) if len(df_correction) > 0 else 0:.2f} problemas por correção\n")
+
+# Análise por modelo
+print(f"{'─'*80}")
+print("Taxa de Correção vs Problema por Modelo:")
+print(f"{'─'*80}\n")
+
+comparison_by_model = pd.DataFrame({
+    'Corrections': df_correction.groupby('model').size(),
+    'Problems': df_problematic.groupby('model').size()
+}).fillna(0)
+
+comparison_by_model['Problem_Rate'] = (comparison_by_model['Problems'] / 
+                                        (comparison_by_model['Corrections'] + comparison_by_model['Problems'])).round(4)
+comparison_by_model['Correction_Rate'] = (comparison_by_model['Corrections'] / 
+                                           (comparison_by_model['Corrections'] + comparison_by_model['Problems'])).round(4)
+comparison_by_model = comparison_by_model.sort_values('Correction_Rate', ascending=False)
+
+print(comparison_by_model[['Corrections', 'Problems', 'Correction_Rate', 'Problem_Rate']])
+
+print(f"\n🏆 MELHOR em correções: {comparison_by_model.index[0]} ({comparison_by_model['Correction_Rate'].iloc[0]*100:.1f}% correções)")
+print(f"⚠️  PIOR em correções: {comparison_by_model.index[-1]} ({comparison_by_model['Correction_Rate'].iloc[-1]*100:.1f}% correções)")
+
+# Visualização: Correções vs Problemas por modelo
+print(f"\nGerando gráfico: Correções vs Problemas por modelo...")
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+# Gráfico 1: Barras empilhadas
+comparison_by_model[['Corrections', 'Problems']].plot(kind='bar', stacked=True, ax=ax1, 
+                                                       color=['#2ecc71', '#e74c3c'])
+ax1.set_title('Patches de Correção vs Problemáticos por Modelo', fontsize=14, fontweight='bold')
+ax1.set_xlabel('Modelo', fontsize=12)
+ax1.set_ylabel('Número de Patches', fontsize=12)
+ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
+ax1.legend(['Correções (seguros)', 'Problemáticos (vulns)'])
+ax1.grid(axis='y', alpha=0.3)
+
+# Gráfico 2: Taxa de correção
+comparison_by_model['Correction_Rate'].plot(kind='bar', ax=ax2, color='steelblue')
+ax2.set_title('Taxa de Sucesso em Correções por Modelo', fontsize=14, fontweight='bold')
+ax2.set_xlabel('Modelo', fontsize=12)
+ax2.set_ylabel('Taxa de Correção (%)', fontsize=12)
+ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, ha='right')
+ax2.set_ylim(0, 1)
+ax2.grid(axis='y', alpha=0.3)
+
+# Adicionar valores nas barras
+for i, v in enumerate(comparison_by_model['Correction_Rate']):
+    ax2.text(i, v + 0.02, f'{v*100:.1f}%', ha='center', va='bottom', fontweight='bold')
+
+plt.tight_layout()
+plt.savefig('correcao_vs_problema_modelo.png', dpi=300, bbox_inches='tight')
+plt.close()
+print("✅ Salvo: correcao_vs_problema_modelo.png")
+
+# Análise de características dos patches de correção
+print(f"\n{'─'*80}")
+print("CARACTERÍSTICAS: Patches de Correção vs Problemáticos")
+print(f"{'─'*80}\n")
+
+correction_features = df_correction[['patch_lines', 'patch_added', 'removal_ratio']].describe()
+problem_features = df_problematic[['patch_lines', 'patch_added', 'removal_ratio']].describe()
+
+print("PATCHES DE CORREÇÃO:")
+print(correction_features.loc[['mean', 'std', '50%']].T)
+print("\nPATCHES PROBLEMÁTICOS:")
+print(problem_features.loc[['mean', 'std', '50%']].T)
+
+print(f"\n💡 INTERPRETAÇÃO:")
+if df_correction['patch_lines'].mean() < df_problematic['patch_lines'].mean():
+    print("   ✅ Patches de CORREÇÃO tendem a ser MENORES (menos linhas)")
+else:
+    print("   ⚠️  Patches de CORREÇÃO tendem a ser MAIORES (mais linhas)")
+
+if df_correction['removal_ratio'].mean() > df_problematic['removal_ratio'].mean():
+    print("   ✅ Patches de CORREÇÃO REMOVEM mais código (limpeza)")
+else:
+    print("   ⚠️  Patches de CORREÇÃO ADICIONAM mais código")
+
+print(f"\n{'='*80}")
+print("✅ Análise de Correção vs Problema concluída!")
+print(f"{'='*80}\n")
 
 print(f"{'='*80}")
 print("✅ Análise das QPs concluída!")
@@ -459,14 +564,8 @@ plt.savefig('shap_beeswarm.png', dpi=300, bbox_inches='tight')
 plt.close()
 print("✅ Salvo: shap_beeswarm.png")
 
-# Exibir os gráficos SHAP
-print("\n📊 Exibindo gráficos SHAP...")
-try:
-    Image.open('shap_summary_bar.png').show()
-    Image.open('shap_beeswarm.png').show()
-    print("✅ Gráficos SHAP exibidos!")
-except Exception as e:
-    print(f"⚠️  Não foi possível exibir as imagens: {e}")
+# SHAP para análise específica (não exibir automaticamente)
+print("\n📊 Gráficos SHAP salvos para análise posterior.")
 
 print("\n💡 INTERPRETAÇÃO DOS GRÁFICOS SHAP:")
 print("   • Bar plot: Importância média absoluta (quanto cada feature contribui)")

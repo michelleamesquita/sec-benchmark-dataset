@@ -54,10 +54,12 @@ network*.py
 cluster_*.jpg
 cluster_*.png
 coeficiente.png
+correcao_vs_problema_modelo.png
 dependencias_cwe.txt
 distribuicoes.png
 grafo_*.jpg
 grafo_*.png
+heatmap_*.png
 hist_*.png
 influencia_*.png
 loglog_*.png
@@ -72,7 +74,6 @@ regressao.png
 relacoes_causais_descobertas.txt
 shap_*.png
 top10_cwes*.png
-heatmap_*.png
 visualizacao_*.jpg
 visualizacao_*.png
 
