@@ -1,0 +1,76 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Imagens geradas
+*.jpg
+*.png
+*.jpeg
+
+# Arquivos de dados temporários
+*.gexf
+*.txt
+!requirements.txt
+!README.md
+
+# Scripts de análise temporários
+analysis.py
+analysis2.py
+analysis3.py
+analysis4*.py
+analysis6*.py
+analysis8*.py
+analysis_comparison*.py
+analysis_investigate.py
+analysis_promptfoo*.py
+analise_*.py
+network*.py
+!analysis_final.py
+
+# Arquivos de output
+cluster_*.jpg
+cluster_*.png
+coeficiente.png
+dependencias_cwe.txt
+distribuicoes.png
+grafo_*.jpg
+grafo_*.png
+hist_*.png
+influencia_*.png
+loglog_*.png
+maior_cluster_*.jpg
+matriz_adjacencia_cwe.png
+powerlaw_*.png
+previsao.png
+rede_*.png
+rede_*.jpg
+rede_*.gexf
+regressao.png
+relacoes_causais_descobertas.txt
+shap_*.png
+visualizacao_*.jpg
+visualizacao_*.png
+
