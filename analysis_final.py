@@ -458,7 +458,11 @@ else:
     if isinstance(shap_values_patches, list):
         shap_values_patches_class1 = shap_values_patches[1]
     else:
-        shap_values_patches_class1 = shap_values_patches
+        # Se não é lista, pode ser array 3D (samples, features, classes)
+        if len(shap_values_patches.shape) == 3:
+            shap_values_patches_class1 = shap_values_patches[:, :, 1]
+        else:
+            shap_values_patches_class1 = shap_values_patches
     
     print(f"✅ SHAP calculado para {sample_size} amostras\n")
     
@@ -745,8 +749,13 @@ if isinstance(shap_values, list):
     shap_values_class1 = shap_values[1]  # Classe positiva (risco)
     print(f"🔬 DEBUG SHAP: shap_values é lista com {len(shap_values)} elementos")
 else:
-    shap_values_class1 = shap_values
-    print(f"🔬 DEBUG SHAP: shap_values é array")
+    # Se não é lista, pode ser array 3D (samples, features, classes)
+    if len(shap_values.shape) == 3:
+        shap_values_class1 = shap_values[:, :, 1]  # Pegar classe 1 (última dimensão)
+        print(f"🔬 DEBUG SHAP: shap_values é array 3D, extraindo classe 1")
+    else:
+        shap_values_class1 = shap_values
+        print(f"🔬 DEBUG SHAP: shap_values é array 2D")
 
 print(f"   Shape de shap_values_class1: {shap_values_class1.shape}")
 print(f"   Shape de X_test_sample: {X_test_sample.shape}")
