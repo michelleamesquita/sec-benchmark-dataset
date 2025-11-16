@@ -390,6 +390,16 @@ print(f"   df_combined_shap: {df_combined_shap.shape[1]} colunas ANTES de drop")
 print(f"   X_patches_full: {X_patches_full.shape[1]} colunas APÓS drop de exclude_cols")
 print(f"   X_patches: {X_patches.shape[1]} colunas FINAL (após conversão float64)")
 
+# Verificar variância das features
+print(f"\n🔬 DEBUG: Verificando VARIÂNCIA das features:")
+feature_variance = X_patches.var()
+zero_variance = feature_variance[feature_variance < 0.0001].index.tolist()
+if len(zero_variance) > 0:
+    print(f"   ⚠️  Features com VARIÂNCIA ZERO (não úteis): {len(zero_variance)}")
+    print(f"       {zero_variance[:10]}")
+else:
+    print(f"   ✅ Todas as features têm variância!")
+
 print(f"\n📊 Usando {X_patches.shape[1]} features (COM features derivadas!)")
 print(f"   Features incluídas: {list(X_patches.columns)}")
 print(f"   ⚠️  ESPERADO: ~22-25 features com derivadas (density, complexity, etc.)!\n")
@@ -418,6 +428,18 @@ else:
     print(f"✅ Modelo treinado com {len(X_patches)} amostras")
     print(f"   • Correções: {(y_patches==0).sum()}")
     print(f"   • Problemáticos: {(y_patches==1).sum()}\n")
+    
+    # DEBUG: Verificar Feature Importance do modelo
+    print(f"🔬 DEBUG: Feature Importance do Random Forest (Correção vs Problemático):")
+    feat_imp_patches = pd.DataFrame({
+        'Feature': X_patches_scaled.columns,
+        'Importance': clf_patches.feature_importances_
+    }).sort_values('Importance', ascending=False)
+    print(feat_imp_patches.head(10).to_string(index=False))
+    
+    non_zero_features = (clf_patches.feature_importances_ > 0.001).sum()
+    print(f"\n   Features com importância > 0.001: {non_zero_features}/{len(clf_patches.feature_importances_)}")
+    print(f"   ⚠️  Se apenas 2-3 features têm importância, o modelo não está usando as outras!\n")
     
     # Calcular SHAP values
     print("Calculando SHAP values para patches de correção...")
