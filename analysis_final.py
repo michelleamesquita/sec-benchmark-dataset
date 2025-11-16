@@ -303,8 +303,14 @@ df_problematic['patch_type'] = 1  # Problemático
 
 df_combined = pd.concat([df_correction, df_problematic], ignore_index=True)
 
-# Preparar features (apenas as principais)
-feature_cols = ['patch_lines', 'patch_added', 'removal_ratio']
+# Preparar features (TODAS as features numéricas, exceto target e patch_type)
+exclude_cols = ['is_risky', 'patch_type']
+numeric_cols = df_combined.select_dtypes(include=[np.number]).columns.tolist()
+feature_cols = [col for col in numeric_cols if col not in exclude_cols]
+
+print(f"\n📊 Usando {len(feature_cols)} features para análise SHAP de Correção vs Problemático")
+print(f"   Features: {feature_cols[:5]}... (total: {len(feature_cols)})\n")
+
 X_patches = df_combined[feature_cols].copy()
 y_patches = df_combined['patch_type'].copy()
 
@@ -424,6 +430,40 @@ else:
 
 print(f"\n{'='*80}")
 print("✅ Análise de Correção vs Problema concluída!")
+print(f"{'='*80}\n")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXIBIR TODAS AS IMAGENS GERADAS
+# ─────────────────────────────────────────────────────────────────────────────
+print(f"{'='*80}")
+print("📊 EXIBINDO TODAS AS IMAGENS GERADAS")
+print(f"{'='*80}\n")
+
+from PIL import Image
+import os
+
+# Lista de imagens para exibir
+images_to_display = [
+    ('top10_cwes_por_modelo.png', 'QP2: Top 10 CWEs por Modelo'),
+    ('heatmap_cwes_modelo.png', 'QP2: Heatmap CWEs x Modelo'),
+    ('correcao_vs_problema_modelo.png', 'QP4: Correção vs Problema por Modelo'),
+    ('shap_correcao_bar.png', 'QP4: SHAP - Importância (Correção)'),
+    ('shap_correcao_beeswarm.png', 'QP4: SHAP - Impacto Direcionado (Correção)'),
+]
+
+print("Exibindo imagens principais da análise:\n")
+for img_file, description in images_to_display:
+    if os.path.exists(img_file):
+        print(f"  ✅ {description}")
+        try:
+            Image.open(img_file).show()
+        except Exception as e:
+            print(f"     ⚠️  Erro ao exibir: {e}")
+    else:
+        print(f"  ❌ {description} - arquivo não encontrado")
+
+print(f"\n{'='*80}")
+print("✅ Todas as imagens principais foram exibidas!")
 print(f"{'='*80}\n")
 
 print(f"{'='*80}")
