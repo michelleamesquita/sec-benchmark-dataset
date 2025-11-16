@@ -10,6 +10,7 @@ from scipy.stats import spearmanr, f_oneway, chi2_contingency
 import warnings
 warnings.filterwarnings('ignore')
 import shap
+from PIL import Image
 
 
 print(f"{'='*70}")
@@ -75,6 +76,22 @@ for cwe, count in all_cwes.items():
 # Criar matriz de CWEs por modelo (para visualização)
 cwe_by_model = df_vulnerable.groupby(['model', 'cwe']).size().unstack(fill_value=0)
 print(f"\n📊 Matriz CWE × Modelo salva internamente para análise posterior\n")
+
+# Gráfico: Top 10 CWEs por ocorrência
+print("Gerando gráfico: Top 10 CWEs...")
+cwe_counts = df_vulnerable['cwe'].value_counts().head(10)
+
+plt.figure(figsize=(8, 6))
+bars = plt.barh(cwe_counts.index[::-1], cwe_counts.values[::-1], color='steelblue')
+for i, (name, value) in enumerate(zip(cwe_counts.index[::-1], cwe_counts.values[::-1])):
+    pct = value / df_vulnerable.shape[0] * 100
+    plt.text(value + max(cwe_counts.values)*0.01, i, f'{value} ({pct:.1f}%)', va='center')
+plt.xlabel('Ocorrências')
+plt.title('Top 10 CWEs por Ocorrência')
+plt.tight_layout()
+plt.savefig('top10_cwes.png', dpi=300, bbox_inches='tight')
+plt.close()
+print("✅ Salvo: top10_cwes.png\n")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QP3: Como o risco se relaciona com o tamanho do patch?
@@ -415,6 +432,15 @@ plt.tight_layout()
 plt.savefig('shap_beeswarm.png', dpi=300, bbox_inches='tight')
 plt.close()
 print("✅ Salvo: shap_beeswarm.png")
+
+# Exibir os gráficos SHAP
+print("\n📊 Exibindo gráficos SHAP...")
+try:
+    Image.open('shap_summary_bar.png').show()
+    Image.open('shap_beeswarm.png').show()
+    print("✅ Gráficos SHAP exibidos!")
+except Exception as e:
+    print(f"⚠️  Não foi possível exibir as imagens: {e}")
 
 print("\n💡 INTERPRETAÇÃO DOS GRÁFICOS SHAP:")
 print("   • Bar plot: Importância média absoluta (quanto cada feature contribui)")
