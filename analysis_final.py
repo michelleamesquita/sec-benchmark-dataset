@@ -373,9 +373,13 @@ df_problematic_shap['patch_type'] = 1  # Problemático
 
 df_combined_shap = pd.concat([df_correction_shap, df_problematic_shap], ignore_index=True)
 
-# Preparar features: usar TODAS as features derivadas (exceto model, is_risky, patch_type)
-exclude_cols = ['model', 'is_risky', 'patch_type']
+# Preparar features: usar TODAS as features derivadas (exceto model, is_risky, patch_type, CWE)
+# IMPORTANTE: Remover features CWE para evitar data leakage!
+exclude_cols = ['model', 'is_risky', 'patch_type', 
+                'cwe_prevalence_overall', 'cwe_severity_score', 'cwe_weighted_severity']
 X_patches_full = df_combined_shap.drop(columns=[c for c in exclude_cols if c in df_combined_shap.columns])
+
+print(f"   🚫 Removendo features CWE (data leakage)...")
 
 # Remover colunas não numéricas
 non_numeric = X_patches_full.select_dtypes(exclude=[np.number]).columns
