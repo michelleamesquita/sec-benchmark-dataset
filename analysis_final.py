@@ -265,6 +265,12 @@ if 'removal_ratio' not in df.columns:
 df_correction = df[(df['is_risky'] == 0) & (df['removal_ratio'] > 0.3)].copy()
 df_problematic = df[df['is_risky'] == 1].copy()
 
+print(f"\n🔍 DEBUG: Verificando features nos dataframes:")
+print(f"   df original: {df.shape[1]} colunas")
+print(f"   df_correction: {df_correction.shape[1]} colunas") 
+print(f"   df_problematic: {df_problematic.shape[1]} colunas")
+print(f"   Colunas em df_correction: {df_correction.columns.tolist()[:10]}...\n")
+
 print(f"📊 Estatísticas:")
 print(f"   • Patches de CORREÇÃO (seguros + removem código): {len(df_correction)}")
 print(f"   • Patches PROBLEMÁTICOS (introduzem vulnerabilidades): {len(df_problematic)}")
@@ -379,9 +385,14 @@ if len(non_numeric) > 0:
 X_patches = X_patches_full.astype('float64')
 y_patches = df_combined_shap['patch_type'].copy()
 
+print(f"\n🔍 DEBUG SHAP: Verificando features para SHAP:")
+print(f"   df_combined_shap: {df_combined_shap.shape[1]} colunas ANTES de drop")
+print(f"   X_patches_full: {X_patches_full.shape[1]} colunas APÓS drop de exclude_cols")
+print(f"   X_patches: {X_patches.shape[1]} colunas FINAL (após conversão float64)")
+
 print(f"\n📊 Usando {X_patches.shape[1]} features (COM features derivadas!)")
-print(f"   Features incluídas: {X_patches.columns.tolist()[:10]}...")
-print(f"   Isso permite ver o impacto de density, complexity, etc.!\n")
+print(f"   Features incluídas: {list(X_patches.columns)}")
+print(f"   ⚠️  ESPERADO: ~22-25 features com derivadas (density, complexity, etc.)!\n")
 
 # Verificar se há amostras suficientes
 if len(X_patches) < 100:
