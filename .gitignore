@@ -71,7 +71,8 @@ rede_*.gexf
 regressao.png
 relacoes_causais_descobertas.txt
 shap_*.png
-top10_cwes.png
+top10_cwes*.png
+heatmap_*.png
 visualizacao_*.jpg
 visualizacao_*.png
 

@@ -77,21 +77,47 @@ for cwe, count in all_cwes.items():
 cwe_by_model = df_vulnerable.groupby(['model', 'cwe']).size().unstack(fill_value=0)
 print(f"\n📊 Matriz CWE × Modelo salva internamente para análise posterior\n")
 
-# Gráfico: Top 10 CWEs por ocorrência
-print("Gerando gráfico: Top 10 CWEs...")
-cwe_counts = df_vulnerable['cwe'].value_counts().head(10)
+# Gráfico: Top 10 CWEs por modelo
+print("Gerando gráfico: Top 10 CWEs por modelo...")
 
-plt.figure(figsize=(8, 6))
-bars = plt.barh(cwe_counts.index[::-1], cwe_counts.values[::-1], color='steelblue')
-for i, (name, value) in enumerate(zip(cwe_counts.index[::-1], cwe_counts.values[::-1])):
-    pct = value / df_vulnerable.shape[0] * 100
-    plt.text(value + max(cwe_counts.values)*0.01, i, f'{value} ({pct:.1f}%)', va='center')
-plt.xlabel('Ocorrências')
-plt.title('Top 10 CWEs por Ocorrência')
+# Pegar os top 10 CWEs globais
+top_10_cwes = df_vulnerable['cwe'].value_counts().head(10).index.tolist()
+
+# Criar matriz: modelos x CWEs (apenas top 10)
+cwe_by_model_top10 = df_vulnerable[df_vulnerable['cwe'].isin(top_10_cwes)].groupby(['model', 'cwe']).size().unstack(fill_value=0)
+
+# Ordenar colunas por total de ocorrências
+col_order = cwe_by_model_top10.sum().sort_values(ascending=False).index
+cwe_by_model_top10 = cwe_by_model_top10[col_order]
+
+# Criar gráfico de barras agrupadas
+fig, ax = plt.subplots(figsize=(14, 8))
+cwe_by_model_top10.plot(kind='bar', ax=ax, width=0.8)
+
+ax.set_xlabel('Modelo', fontsize=12, fontweight='bold')
+ax.set_ylabel('Número de Ocorrências', fontsize=12, fontweight='bold')
+ax.set_title('Top 10 CWEs por Modelo', fontsize=14, fontweight='bold', pad=20)
+ax.legend(title='CWE', bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=9)
+ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+ax.grid(axis='y', alpha=0.3, linestyle='--')
+
 plt.tight_layout()
-plt.savefig('top10_cwes.png', dpi=300, bbox_inches='tight')
+plt.savefig('top10_cwes_por_modelo.png', dpi=300, bbox_inches='tight')
 plt.close()
-print("✅ Salvo: top10_cwes.png\n")
+print("✅ Salvo: top10_cwes_por_modelo.png")
+
+# Gráfico adicional: Heatmap de CWEs por modelo
+print("Gerando heatmap: CWEs por modelo...")
+plt.figure(figsize=(12, 8))
+sns.heatmap(cwe_by_model_top10.T, annot=True, fmt='d', cmap='YlOrRd', 
+            cbar_kws={'label': 'Ocorrências'}, linewidths=0.5)
+plt.xlabel('Modelo', fontsize=12, fontweight='bold')
+plt.ylabel('CWE', fontsize=12, fontweight='bold')
+plt.title('Heatmap: Top 10 CWEs por Modelo', fontsize=14, fontweight='bold', pad=20)
+plt.tight_layout()
+plt.savefig('heatmap_cwes_modelo.png', dpi=300, bbox_inches='tight')
+plt.close()
+print("✅ Salvo: heatmap_cwes_modelo.png\n")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QP3: Como o risco se relaciona com o tamanho do patch?
