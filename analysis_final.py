@@ -696,6 +696,17 @@ feat_importance = pd.DataFrame({
 print("TOP 15 Features por importância:\n")
 print(feat_importance.head(15).to_string(index=False))
 
+# Debug: quantas features têm importância > 0
+non_zero_imp = (feat_importance['Importance'] > 0.001).sum()
+print(f"\n🔬 DEBUG: Features com importância > 0.001: {non_zero_imp}/{len(feat_importance)}")
+
+# Mostrar features derivadas especificamente
+derived_features = ['patch_density', 'prompt_density', 'prompt_token_density', 
+                   'patch_complexity', 'change_intensity', 'hunks_per_file',
+                   'add_remove_ratio', 'net_per_line', 'temp_x_prompt_size', 'temp_x_patch_size']
+derived_in_top = feat_importance.head(15)['Feature'].isin(derived_features).sum()
+print(f"   Features DERIVADAS no Top 15: {derived_in_top}")
+
 print(f"\n💡 Feature Importance mede quanto cada feature contribui para as decisões")
 print(f"   das árvores (quanto maior, mais importante para distinguir as classes)\n")
 
