@@ -288,6 +288,118 @@ if df_correction['removal_ratio'].mean() > df_problematic['removal_ratio'].mean(
 else:
     print("   ⚠️  Patches de CORREÇÃO ADICIONAM mais código")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SHAP ANALYSIS: O que distingue patches de CORREÇÃO de PROBLEMÁTICOS?
+# ─────────────────────────────────────────────────────────────────────────────
+print(f"\n{'─'*80}")
+print("SHAP ANALYSIS: Features que distinguem Correção vs Problemático")
+print(f"{'─'*80}\n")
+
+print("🔬 Treinando modelo específico para distinguir correções de problemas...\n")
+
+# Combinar datasets e criar labels
+df_correction['patch_type'] = 0  # Correção
+df_problematic['patch_type'] = 1  # Problemático
+
+df_combined = pd.concat([df_correction, df_problematic], ignore_index=True)
+
+# Preparar features (apenas as principais)
+feature_cols = ['patch_lines', 'patch_added', 'removal_ratio']
+X_patches = df_combined[feature_cols].copy()
+y_patches = df_combined['patch_type'].copy()
+
+# Verificar se há amostras suficientes
+if len(X_patches) < 100:
+    print(f"⚠️  Amostras insuficientes para análise SHAP ({len(X_patches)} amostras)")
+    print("   Pulando análise SHAP específica...\n")
+else:
+    # Normalizar
+    scaler_patches = MinMaxScaler()
+    X_patches_scaled = pd.DataFrame(
+        scaler_patches.fit_transform(X_patches), 
+        columns=X_patches.columns
+    )
+    
+    # Treinar modelo específico
+    clf_patches = RandomForestClassifier(
+        n_estimators=50, 
+        max_depth=10, 
+        random_state=42, 
+        n_jobs=-1
+    )
+    clf_patches.fit(X_patches_scaled, y_patches)
+    
+    print(f"✅ Modelo treinado com {len(X_patches)} amostras")
+    print(f"   • Correções: {(y_patches==0).sum()}")
+    print(f"   • Problemáticos: {(y_patches==1).sum()}\n")
+    
+    # Calcular SHAP values
+    print("Calculando SHAP values para patches de correção...")
+    explainer_patches = shap.TreeExplainer(clf_patches)
+    
+    # Usar amostra se dataset for grande
+    sample_size = min(200, len(X_patches_scaled))
+    X_patches_sample = X_patches_scaled.sample(n=sample_size, random_state=42)
+    shap_values_patches = explainer_patches.shap_values(X_patches_sample)
+    
+    # Para classificação binária, pegar classe 1 (problemático)
+    if isinstance(shap_values_patches, list):
+        shap_values_patches_class1 = shap_values_patches[1]
+    else:
+        shap_values_patches_class1 = shap_values_patches
+    
+    print(f"✅ SHAP calculado para {sample_size} amostras\n")
+    
+    # Gráfico 1: SHAP Summary (bar plot)
+    print("Gerando SHAP summary bar plot...")
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values_patches_class1, X_patches_sample, 
+                      plot_type="bar", show=False)
+    plt.title('SHAP: Features que aumentam risco de ser PROBLEMÁTICO', 
+              fontsize=14, fontweight='bold', pad=15)
+    plt.tight_layout()
+    plt.savefig('shap_correcao_bar.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    print("✅ Salvo: shap_correcao_bar.png")
+    
+    # Gráfico 2: SHAP Beeswarm (direção e magnitude)
+    print("Gerando SHAP beeswarm plot...")
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values_patches_class1, X_patches_sample, show=False)
+    plt.title('SHAP: Impacto das Features (Correção → Problemático)', 
+              fontsize=14, fontweight='bold', pad=15)
+    plt.tight_layout()
+    plt.savefig('shap_correcao_beeswarm.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    print("✅ Salvo: shap_correcao_beeswarm.png")
+    
+    # Análise de importância
+    print(f"\n{'─'*60}")
+    print("INTERPRETAÇÃO SHAP: O que torna um patch PROBLEMÁTICO?")
+    print(f"{'─'*60}\n")
+    
+    shap_importance_patches = np.abs(shap_values_patches_class1).mean(axis=0)
+    shap_df_patches = pd.DataFrame({
+        'Feature': X_patches_sample.columns,
+        'SHAP_Importance': shap_importance_patches
+    }).sort_values('SHAP_Importance', ascending=False)
+    
+    print(shap_df_patches.to_string(index=False))
+    
+    print(f"\n💡 INTERPRETAÇÃO:")
+    top_feature = shap_df_patches.iloc[0]['Feature']
+    print(f"   • Feature mais importante: {top_feature}")
+    print(f"   • No beeswarm plot:")
+    print(f"     - Vermelho = valor ALTO da feature")
+    print(f"     - Azul = valor BAIXO da feature")
+    print(f"     - Direita (positivo) = AUMENTA chance de ser problemático")
+    print(f"     - Esquerda (negativo) = AUMENTA chance de ser correção")
+    
+    if top_feature == 'removal_ratio':
+        print(f"\n   ✅ 'removal_ratio' é chave: patches que REMOVEM código tendem a ser correções!")
+    elif top_feature == 'patch_lines':
+        print(f"\n   ✅ 'patch_lines' é chave: tamanho do patch é um indicador forte!")
+
 print(f"\n{'='*80}")
 print("✅ Análise de Correção vs Problema concluída!")
 print(f"{'='*80}\n")
