@@ -44,3 +44,9 @@ Example DATASET
 	claude	claud-sonnet_backup	astropy	astropy-14628	astropy__astropy-14628_bandit_after.json	runs/claude-sonnet-4-20250514/repos_patched/astropy__astropy-14628/astropy/coordinates/baseframe.py	1220	B110	try_except_pass	CWE-703	LOW	HIGH	Try, Except, Pass detected.	50	16	2	1	4	18	14	2355	40	588	0	0.2	0	0.2633053335774729	1	0.2633053335774729
 	
 ```
+
+---
+
+## Ambiente
+
+O ambiente computacional utilizado nos experimentos foi composto por processador Apple M4, 24 GB de memória unificada, 1 TB de armazenamento e sistema operacional macOS 15.7.4. A implementação foi realizada em Python 3.9.19, com uso de bibliotecas instaladas via  pip , entre as quais se destacam  bandit  1.7.9,  networkx  3.3,  pandas  2.2.2,  tqdm  4.66.4,  pyyaml  6.0.2,  matplotlib ,  matplotlib-venn ,  openai  0.28.0,  anthropic ,  transformers  (>= 4.43.0),  accelerate  (>= 0.33.0),  torch  (>= 2.3.0),  bitsandbytes ,  huggingface_hub  0.23.5,  datasets ,  sentencepiece  e  tokenizers .
