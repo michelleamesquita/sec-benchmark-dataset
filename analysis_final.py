@@ -898,12 +898,22 @@ print(cm)
 
 # Salvar figura: previsao.png (Matriz de Confusão)
 plt.figure(figsize=(6,5))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-            xticklabels=['Previsto 0','Previsto 1'],
-            yticklabels=['Real 0','Real 1'])
-plt.title('Matriz de Confusão - Random Forest')
-plt.xlabel('Previsto')
-plt.ylabel('Real')
+cm_pct = (cm / cm.sum()) * 100
+cm_annot = np.array(
+    [
+        [f"{cm[i, j]}\n({cm_pct[i, j]:.1f}%)" for j in range(cm.shape[1])]
+        for i in range(cm.shape[0])
+    ]
+)
+sns.heatmap(cm, annot=cm_annot, fmt='', cmap='Blues',
+            annot_kws={"fontsize": 11},
+            xticklabels=['Previsto 0 (Sem risco)','Previsto 1 (Com risco)'],
+            yticklabels=['Real 0 (Sem risco)','Real 1 (Com risco)'])
+plt.title('Matriz de Confusão - Random Forest', fontsize=13)
+plt.xlabel('Previsto', fontsize=12)
+plt.ylabel('Real', fontsize=12)
+plt.xticks(fontsize=10)
+plt.yticks(fontsize=10)
 plt.tight_layout()
 plt.savefig('previsao.png')
 plt.close()
@@ -916,7 +926,7 @@ report_dict = classification_report(y_test, y_pred, output_dict=True)
 classes = ['0','1']
 metrics = ['precision','recall','f1-score']
 plot_df = pd.DataFrame({m: [report_dict.get(c,{}).get(m,0) for c in classes] for m in metrics},
-                       index=['Classe 0','Classe 1'])
+                       index=['Classe 0 (Sem risco)','Classe 1 (Com risco)'])
 plot_df.plot(kind='bar', figsize=(7,5))
 plt.ylim(0,1)
 plt.title('Métricas por Classe - Random Forest')
